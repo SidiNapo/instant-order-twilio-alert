@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { Input } from "@/components/ui/input";
@@ -24,25 +25,34 @@ const OrderForm = () => {
     setIsSubmitting(true);
 
     try {
+      // Create the order data object with proper column names
+      const orderData = {
+        customer_name: orderDetails.customerName,
+        phone_number: orderDetails.phoneNumber,
+        address: orderDetails.address,
+        items: orderDetails.items,
+        quantity: orderDetails.quantity
+      };
+
       // Store order in Supabase
       const { error: dbError } = await supabase
         .from('orders')
-        .insert([{
-          customer_name: orderDetails.customerName,
-          phone_number: orderDetails.phoneNumber,
-          address: orderDetails.address,
-          items: orderDetails.items,
-          quantity: orderDetails.quantity
-        }]);
+        .insert(orderData);
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        console.error('Database error:', dbError);
+        throw new Error('Failed to save order to database');
+      }
 
       // Send WhatsApp notification
       const { error: whatsappError } = await supabase.functions.invoke('send-whatsapp', {
         body: { orderDetails }
       });
 
-      if (whatsappError) throw whatsappError;
+      if (whatsappError) {
+        console.error('WhatsApp notification error:', whatsappError);
+        throw new Error('Failed to send notification');
+      }
 
       toast({
         title: "Order Submitted Successfully!",
