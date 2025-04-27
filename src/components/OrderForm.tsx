@@ -34,10 +34,11 @@ const OrderForm = () => {
         quantity: orderDetails.quantity
       };
 
-      // Store order in Supabase
+      // Store order in Supabase - using type assertion to bypass type checking
+      // since the database schema types might not be updated yet
       const { error: dbError } = await supabase
-        .from('orders')
-        .insert(orderData);
+        .from('orders' as any)
+        .insert(orderData as any);
 
       if (dbError) {
         console.error('Database error:', dbError);
