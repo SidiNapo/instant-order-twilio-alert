@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { Input } from "@/components/ui/input";
@@ -7,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { OrderDetails } from "@/types/order";
 import { Send } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const OrderForm = () => {
   const { toast } = useToast();
@@ -23,21 +23,50 @@ const OrderForm = () => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // For now, we'll just show a success message
-    // Later we'll integrate with Twilio via Supabase
-    toast({
-      title: "Order Submitted!",
-      description: "Your order has been received. We'll contact you shortly.",
-    });
+    try {
+      // Store order in Supabase
+      const { error: dbError } = await supabase
+        .from('orders')
+        .insert([{
+          customer_name: orderDetails.customerName,
+          phone_number: orderDetails.phoneNumber,
+          address: orderDetails.address,
+          items: orderDetails.items,
+          quantity: orderDetails.quantity
+        }]);
 
-    setIsSubmitting(false);
-    setOrderDetails({
-      customerName: "",
-      phoneNumber: "",
-      address: "",
-      items: "",
-      quantity: 1,
-    });
+      if (dbError) throw dbError;
+
+      // Send WhatsApp notification
+      const { error: whatsappError } = await supabase.functions.invoke('send-whatsapp', {
+        body: { orderDetails }
+      });
+
+      if (whatsappError) throw whatsappError;
+
+      toast({
+        title: "Order Submitted Successfully!",
+        description: "We'll contact you shortly to confirm your order.",
+      });
+
+      // Reset form
+      setOrderDetails({
+        customerName: "",
+        phoneNumber: "",
+        address: "",
+        items: "",
+        quantity: 1,
+      });
+    } catch (error) {
+      console.error('Error submitting order:', error);
+      toast({
+        title: "Error Submitting Order",
+        description: "Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (
