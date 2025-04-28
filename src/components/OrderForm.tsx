@@ -99,22 +99,24 @@ const OrderForm = () => {
 
       // Send WhatsApp notification
       const { error: notificationError } = await supabase.functions.invoke('send-whatsapp-notification', {
-        body: { 
-          orderDetails: orderData
-        }
+        body: { orderDetails: orderData }
       });
 
       if (notificationError) {
         console.error("Notification error:", notificationError);
         // We don't throw here because we want to show success even if notification fails
         // The order is saved in the database, and admin can still see it there
+        toast({
+          title: "Order Saved",
+          description: "Your order was saved, but there was an issue sending the notification to admin.",
+        });
+      } else {
+        // Show success message
+        toast({
+          title: "Order Submitted Successfully!",
+          description: "Thank you for your order. We'll contact you shortly to confirm.",
+        });
       }
-
-      // Show success message
-      toast({
-        title: "Order Submitted Successfully!",
-        description: "Thank you for your order. We'll contact you shortly to confirm.",
-      });
 
       // Reset form
       setOrderData({

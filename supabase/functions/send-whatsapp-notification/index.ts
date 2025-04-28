@@ -7,20 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Create Twilio client using Deno-compatible imports
-const createTwilioClient = async () => {
-  const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-  const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-  
-  if (!accountSid || !authToken) {
-    throw new Error('Missing Twilio credentials');
-  }
-
-  // Import Twilio from npm using Deno's compatibility layer
-  const { Twilio } = await import("npm:twilio@4.21.0");
-  return new Twilio(accountSid, authToken);
-}
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -51,31 +37,49 @@ Order received on: ${new Date().toLocaleString()}`;
 
     console.log('Sending WhatsApp notification to admin phone:', adminPhone);
     
-    try {
-      // Initialize Twilio client
-      const client = await createTwilioClient();
-      
-      // Send WhatsApp message using Twilio
-      const response = await client.messages.create({
-        body: message,
-        from: 'whatsapp:+14155238886', // Default Twilio WhatsApp sandbox number
-        to: `whatsapp:${adminPhone}`
-      });
-
-      console.log('WhatsApp message sent successfully, SID:', response.sid);
-
-      // Return success response
-      return new Response(
-        JSON.stringify({ success: true, messageId: response.sid }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      );
-    } catch (twilioError) {
-      console.error('Twilio error:', twilioError);
-      throw new Error(`Failed to send WhatsApp notification: ${twilioError.message}`);
+    // Twilio credentials from environment variables
+    const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
+    const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+    
+    if (!accountSid || !authToken) {
+      throw new Error('Missing Twilio credentials');
     }
+
+    // Call Twilio API directly using fetch instead of the SDK
+    const twilioEndpoint = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+    const auth = btoa(`${accountSid}:${authToken}`);
+
+    const formData = new URLSearchParams();
+    formData.append('To', `whatsapp:${adminPhone}`);
+    formData.append('From', 'whatsapp:+14155238886'); // Default Twilio WhatsApp sandbox number
+    formData.append('Body', message);
+
+    const twilioResponse = await fetch(twilioEndpoint, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData,
+    });
+
+    const twilioResult = await twilioResponse.json();
+    
+    if (!twilioResponse.ok) {
+      console.error('Twilio API error:', twilioResult);
+      throw new Error(`Twilio API error: ${twilioResult.message || 'Unknown error'}`);
+    }
+
+    console.log('WhatsApp message sent successfully, SID:', twilioResult.sid);
+
+    // Return success response
+    return new Response(
+      JSON.stringify({ success: true, messageId: twilioResult.sid }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      }
+    );
   } catch (error) {
     console.error('Error in send-whatsapp-notification function:', error);
     
