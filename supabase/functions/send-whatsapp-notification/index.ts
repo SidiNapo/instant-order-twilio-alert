@@ -1,25 +1,14 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
-// Define Twilio client interface
-interface TwilioClient {
-  messages: {
-    create: (params: {
-      body: string;
-      from: string;
-      to: string;
-    }) => Promise<{ sid: string }>;
-  }
-}
-
 // Configure CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Create Twilio client
-const createTwilioClient = (): TwilioClient => {
+// Create Twilio client using Deno-compatible imports
+const createTwilioClient = async () => {
   const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
   const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
   
@@ -27,9 +16,9 @@ const createTwilioClient = (): TwilioClient => {
     throw new Error('Missing Twilio credentials');
   }
 
-  // Import Twilio from npm
-  const twilio = require('npm:twilio@4.21.0');
-  return twilio(accountSid, authToken);
+  // Import Twilio from npm using Deno's compatibility layer
+  const { Twilio } = await import("npm:twilio@4.21.0");
+  return new Twilio(accountSid, authToken);
 }
 
 serve(async (req) => {
@@ -64,7 +53,7 @@ Order received on: ${new Date().toLocaleString()}`;
     
     try {
       // Initialize Twilio client
-      const client = createTwilioClient();
+      const client = await createTwilioClient();
       
       // Send WhatsApp message using Twilio
       const response = await client.messages.create({
