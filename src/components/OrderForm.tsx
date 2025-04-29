@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -78,45 +77,21 @@ const OrderForm = () => {
     setIsSubmitting(true);
 
     try {
-      // Prepare the data for Supabase
-      const dbOrderData = {
-        customer_name: orderData.customerName,
-        phone_number: orderData.phoneNumber,
-        address: orderData.address,
-        items: orderData.items,
-        quantity: orderData.quantity
-      };
-
-      // Save order to database
-      const { error: dbError } = await supabase
-        .from('orders')
-        .insert(dbOrderData);
-
-      if (dbError) {
-        console.error("Database error:", dbError);
-        throw new Error("Failed to save order to database");
-      }
-
-      // Send WhatsApp notification
-      const { error: notificationError } = await supabase.functions.invoke('send-whatsapp-notification', {
-        body: { orderDetails: orderData }
+      // Submit order to API endpoint
+      const { error } = await supabase.functions.invoke('submit-order', {
+        body: { orderData }
       });
 
-      if (notificationError) {
-        console.error("Notification error:", notificationError);
-        // We don't throw here because we want to show success even if notification fails
-        // The order is saved in the database, and admin can still see it there
-        toast({
-          title: "Order Saved",
-          description: "Your order was saved, but there was an issue sending the notification to admin.",
-        });
-      } else {
-        // Show success message
-        toast({
-          title: "Order Submitted Successfully!",
-          description: "Thank you for your order. We'll contact you shortly to confirm.",
-        });
+      if (error) {
+        console.error("API error:", error);
+        throw new Error("Failed to submit order to API");
       }
+
+      // Show success message
+      toast({
+        title: "Order Submitted Successfully!",
+        description: "Thank you for your order. We'll contact you shortly to confirm.",
+      });
 
       // Reset form
       setOrderData({
